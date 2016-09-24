@@ -11,4 +11,5 @@ const char* getHostname();
 void setupWifi();
 void loopWifi();
 
+extern NTPClient timeClient;
 #endif

@@ -1,9 +1,9 @@
 #include <Arduino.h>
+#include <Switch.h>
 
 #include "SPI.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
-#include "Switch.h"
 
 #include "myWifi.h"
 
@@ -28,8 +28,10 @@ void setup() {
   analogWrite(TFT_BL, 1);
 
   tft.begin();
+  tft.setRotation(3);
 
   setupWifi();
+  timeClient.setTimeOffset(-7*60*60);
 
 
   // read diagnostics (optional but can help debug problems)
@@ -44,8 +46,7 @@ void setup() {
   x = tft.readcommand8(ILI9341_RDSELFDIAG);
   Serial.print("Self Diagnostic: 0x"); Serial.println(x, HEX);
 
-  testText();
-
+  tft.fillScreen(ILI9341_BLACK);
 }
 
 
@@ -65,54 +66,29 @@ void loop(void) {
     }
   }
 
-  Serial.printf("texttime: %dms\n",testText()/1000);
-  Serial.printf("brightness: %d\n", b);
-  tft.printf("brightness: %d\n", b);
-  uint32_t ambient = analogRead(LIGHT_SENSOR);
-  Serial.printf("ambient: %d\n", ambient);
-  tft.printf("ambient: %d\n", ambient);
+  int h = timeClient.getHours();
+  int m = timeClient.getMinutes();
+  if (h > 12) { h -= 12; }
+  if (h == 0) { h = 12; }
 
-}
-
-unsigned long testFillScreen() {
-  unsigned long start = micros();
-  tft.fillScreen(ILI9341_BLACK);
-  yield();
-  tft.fillScreen(ILI9341_RED);
-  yield();
-  tft.fillScreen(ILI9341_GREEN);
-  yield();
-  tft.fillScreen(ILI9341_BLUE);
-  yield();
-  tft.fillScreen(ILI9341_BLACK);
-  yield();
-  return micros() - start;
-}
-
-unsigned long testText() {
-//  tft.fillScreen(ILI9341_BLACK);
-  unsigned long start = micros();
   tft.setCursor(0, 0);
-  tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);  tft.setTextSize(1);
-  tft.println("Hello World!");
-  tft.setTextColor(ILI9341_YELLOW, ILI9341_BLACK); tft.setTextSize(2);
-  tft.println(1234.56);
-  tft.setTextColor(ILI9341_RED, ILI9341_BLACK);    tft.setTextSize(3);
-  tft.println(0xDEADBEEF, HEX);
-  tft.println();
-  tft.setTextColor(ILI9341_GREEN, ILI9341_BLACK);
-  tft.setTextSize(5);
-  tft.println("Groop");
+  tft.setTextSize(9);
+  tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+  tft.printf("\n%2d:%02d",h,m);
+
   tft.setTextSize(2);
-  tft.println("I implore thee,");
-  tft.setTextSize(1);
-  tft.println("my foonting turlingdromes.");
-  tft.println("And hooptiously drangle me");
-  tft.println("with crinkly bindlewurdles,");
-  tft.println("Or I will rend thee");
-  tft.println("in the gobberwarts");
-  tft.println("with my blurglecruncheon,");
-  tft.println("see if I don't!");
-  return micros() - start;
+  tft.printf("%02d",timeClient.getSeconds());
+
+  tft.setTextSize(9);
+  tft.println();
+
+  tft.setTextSize(2);
+
+  tft.printf("brightness: %4d\n\n", b);
+
+  uint32_t ambient = analogRead(LIGHT_SENSOR);
+  tft.printf("ambient: %4d\n\n", ambient);
+
 }
+
 

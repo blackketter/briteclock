@@ -4,7 +4,7 @@
 #include "SPI.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
-
+#include "TimeLib.h"
 #include "myWifi.h"
 
 #define TFT_DC     2
@@ -30,9 +30,7 @@ void setup() {
   tft.begin();
   tft.setRotation(3);
 
-  setupWifi();
-  timeClient.setTimeOffset(-7*60*60);
-
+  setupWifi("briteclock", -7*60*60);
 
   // read diagnostics (optional but can help debug problems)
   uint8_t x = tft.readcommand8(ILI9341_RDMODE);
@@ -66,8 +64,8 @@ void loop(void) {
     }
   }
 
-  int h = timeClient.getHours();
-  int m = timeClient.getMinutes();
+  int h = hour();
+  int m = minute();
   if (h > 12) { h -= 12; }
   if (h == 0) { h = 12; }
 
@@ -77,7 +75,7 @@ void loop(void) {
   tft.printf("\n%2d:%02d",h,m);
 
   tft.setTextSize(2);
-  tft.printf("%02d",timeClient.getSeconds());
+  tft.printf("%02d",second());
 
   tft.setTextSize(9);
   tft.println();

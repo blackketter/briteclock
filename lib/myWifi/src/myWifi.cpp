@@ -1,6 +1,10 @@
 #include "myWifi.h"
 
-const char* getHostname() { return "briteclock"; }
+const char* hostName;
+
+const char* getHostname() { return hostName; }
+
+
 const char* ssid = "bkn";
 const char* password = "5d4bf72344";
 
@@ -13,13 +17,24 @@ bool networkUp = false;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 
-void setupWifi() {
+time_t ntpSyncProvider() {
+  return timeClient.getEpochTime();
+}
+
+void setupWifi(const char* hostname, int32_t timeZoneOffset) {
+  hostName = hostname;
+
   Serial.println("Begining setupWifi()");
   Serial.printf("MAC address: %s\n", WiFi.macAddress().c_str());
   Serial.printf("Hostname: %s\n", getHostname());
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
+
   timeClient.begin();
+  timeClient.setTimeOffset(timeZoneOffset);
+
+  setSyncProvider(&ntpSyncProvider);
+  setSyncInterval(5);
 
   // Port defaults to 8266
   // ArduinoOTA.setPort(8266);
@@ -51,8 +66,6 @@ void setupWifi() {
   });
   ArduinoOTA.begin();
 }
-
-
 
 void loopWifi() {
   timeClient.update();

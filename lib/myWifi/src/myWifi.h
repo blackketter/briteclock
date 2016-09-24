@@ -1,5 +1,7 @@
 #ifndef _myWifi_
 #define _myWifi_
+
+#include <TimeLib.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266HTTPClient.h>
@@ -7,9 +9,9 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 
-const char* getHostname();
-void setupWifi();
+void setupWifi(const char* hostName, int32_t timeZoneOffset = 0);
 void loopWifi();
 
-extern NTPClient timeClient;
+const char* getHostName();
+
 #endif

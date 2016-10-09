@@ -6,6 +6,9 @@
 #include "Adafruit_ILI9341.h"
 #include "TimeLib.h"
 #include "myWifi.h"
+#include "WiFiConsole.h"
+
+WiFiConsole console;
 
 #define TFT_DC     2
 #define TFT_CS     4
@@ -21,28 +24,28 @@ Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC);
 // todo - make this configurable
 
 void setup() {
-  Serial.begin(9600);
-  Serial.println("ILI9341 Test!");
+
+  setupWifi("briteclock", -7*60*60);
+
+  console.begin();
 
   pinMode(TFT_BL, OUTPUT);
   analogWrite(TFT_BL, 1);
 
   tft.begin();
-  tft.setRotation(3);
-
-  setupWifi("briteclock", -7*60*60);
+  tft.setRotation(1);
 
   // read diagnostics (optional but can help debug problems)
   uint8_t x = tft.readcommand8(ILI9341_RDMODE);
-  Serial.print("Display Power Mode: 0x"); Serial.println(x, HEX);
+  console.print("Display Power Mode: 0x"); console.println(x, HEX);
   x = tft.readcommand8(ILI9341_RDMADCTL);
-  Serial.print("MADCTL Mode: 0x"); Serial.println(x, HEX);
+  console.print("MADCTL Mode: 0x"); console.println(x, HEX);
   x = tft.readcommand8(ILI9341_RDPIXFMT);
-  Serial.print("Pixel Format: 0x"); Serial.println(x, HEX);
+  console.print("Pixel Format: 0x"); console.println(x, HEX);
   x = tft.readcommand8(ILI9341_RDIMGFMT);
-  Serial.print("Image Format: 0x"); Serial.println(x, HEX);
+  console.print("Image Format: 0x"); console.println(x, HEX);
   x = tft.readcommand8(ILI9341_RDSELFDIAG);
-  Serial.print("Self Diagnostic: 0x"); Serial.println(x, HEX);
+  console.print("Self Diagnostic: 0x"); console.println(x, HEX);
 
   tft.fillScreen(ILI9341_BLACK);
 }
@@ -50,18 +53,19 @@ void setup() {
 
 void loop(void) {
   button.poll();
+  console.loop();
   loopWifi();
 
   static uint32_t b = PWMRANGE;
 
   if (button.pushed()) {
-    analogWrite(TFT_BL, ~b);
-    Serial.println(b);
     if (b == 0) {
       b = PWMRANGE;
     } else {
       b=b>>1;
     }
+//    analogWrite(TFT_BL, ~b);
+    console.printf("brightness: %4d\n\n", b);
   }
 
   int h = hour();
@@ -82,11 +86,11 @@ void loop(void) {
 
   tft.setTextSize(2);
 
-  tft.printf("brightness: %4d\n\n", b);
+  tft.printf("brightness: %4d\n", b);
 
   uint32_t ambient = analogRead(LIGHT_SENSOR);
   tft.printf("ambient: %4d\n\n", ambient);
-
+  analogWrite(TFT_BL, ~ambient);
 }
 
 

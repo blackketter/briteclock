@@ -7,6 +7,7 @@
 #include "TimeLib.h"
 #include "myWifi.h"
 #include "WiFiConsole.h"
+#include "Clock.h"
 
 WiFiConsole console;
 
@@ -20,6 +21,7 @@ Switch button = Switch(BUTTON_PIN);  // Switch between a digital pin and GND
 
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC);
 
+Clock clock = Clock();
 
 // todo - make this configurable
 
@@ -52,20 +54,34 @@ void setup() {
 
 
 void loop(void) {
-  button.poll();
   console.loop();
+
+//  console.debugln("polling");
+  button.poll();
+
+//  console.debugln("wifi");
   loopWifi();
 
-  static uint32_t b = PWMRANGE;
+  static time_t lastTime = 0;
+  static int fps = 0;
+  static int lastfps = 0;
+  if (now() != lastTime) {
+    lastTime = now();
+    char time[100];
+    clock.longTime(time);
+    console.debugln(time);
+    console.debugf("%2d fps\n", fps);
+
+    lastfps = fps;
+    fps = 0;
+
+  } else {
+    fps++;
+  }
+
+  static uint32_t b = 0;
 
   if (button.pushed()) {
-    if (b == 0) {
-      b = PWMRANGE;
-    } else {
-      b=b>>1;
-    }
-//    analogWrite(TFT_BL, ~b);
-    console.printf("brightness: %4d\n\n", b);
   }
 
   int h = hour();
@@ -75,7 +91,8 @@ void loop(void) {
 
   tft.setCursor(0, 0);
   tft.setTextSize(9);
-  tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+  uint16_t c = ILI9341_RED;
+  tft.setTextColor(c, ILI9341_BLACK);
   tft.printf("\n%2d:%02d",h,m);
 
   tft.setTextSize(2);
@@ -86,11 +103,32 @@ void loop(void) {
 
   tft.setTextSize(2);
 
+  tft.printf("wifi: %d\n", WiFi.isConnected());
+  uint32_t ambient = analogRead(LIGHT_SENSOR);
+  tft.printf("ambient: %4d\n", ambient);
+  b = PWMRANGE - ambient;
+  analogWrite(TFT_BL, b);
   tft.printf("brightness: %4d\n", b);
 
-  uint32_t ambient = analogRead(LIGHT_SENSOR);
-  tft.printf("ambient: %4d\n\n", ambient);
-  analogWrite(TFT_BL, ~ambient);
+     static int16_t x = 0;
+    static uint32_t lastmillis = millis();
+    uint32_t ms = millis() - lastmillis;
+    lastmillis = millis();
+
+    tft.printf("fps: %2d (%4d)ms\n", lastfps, ms);
+//  console.debugln("done");
+
+    const int maxheight = 30;
+    const int maxmillis = 500;
+    uint16_t height = (ms * maxheight)/ maxmillis;
+    if (height > maxheight) { height = maxheight; }
+    if (ms > 49) { ms = 49; }
+    tft.drawLine(x,239-height,x,239-maxheight,ILI9341_BLACK);
+    tft.drawLine(x,239,x,239-height, ILI9341_BLUE);
+    x++;
+    if (x>319) { x = 0; }
+
+
 }
 
 

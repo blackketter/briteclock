@@ -46,15 +46,15 @@ void setup() {
 
   // read diagnostics (optional but can help debug problems)
   uint8_t x = tft.readcommand8(ILI9341_RDMODE);
-  console.print("Display Power Mode: 0x"); console.println(x, HEX);
+  console.debugf("Display Power Mode: 0x%x\n", x);
   x = tft.readcommand8(ILI9341_RDMADCTL);
-  console.print("MADCTL Mode: 0x"); console.println(x, HEX);
+  console.debugf("MADCTL Mode: 0x%x\n", x);
   x = tft.readcommand8(ILI9341_RDPIXFMT);
-  console.print("Pixel Format: 0x"); console.println(x, HEX);
+  console.debugf("Pixel Format: 0x%x\n", x);
   x = tft.readcommand8(ILI9341_RDIMGFMT);
-  console.print("Image Format: 0x"); console.println(x, HEX);
+  console.debugf("Image Format: 0x%x\n", x);
   x = tft.readcommand8(ILI9341_RDSELFDIAG);
-  console.print("Self Diagnostic: 0x"); console.println(x, HEX);
+  console.debugf("Self Diagnostic: 0x%x\n", x);
 
   tft.fillScreen(ILI9341_BLACK);
 
@@ -84,11 +84,6 @@ void loop(void) {
 
   if (Uptime::seconds() != lastTime) {
     lastTime = Uptime::seconds();
-    char time[100];
-    clock.longTime(time);
-    console.debugln(time);
-    console.debugf("%2d fps\n", fps);
-
     lastfps = fps;
     fps = 0;
 
@@ -127,7 +122,11 @@ void loop(void) {
 
   if (button.longPressLatch()) {
     // draw info
-    tft.printf("Time: %2d:%02d:%02d.%01d\n",clock.hourFormat12(),clock.minute(),clock.second(),clock.fracMillis()/100);
+    tft.print("Date: ");
+    clock.shortDate(tft);
+    tft.print("\nTime: ");
+    clock.longTime(tft);
+    tft.printf(".%01d\n",clock.fracMillis()/100);
     tft.printf("wifi: %s\n", WiFi.isConnected() ? "connected   " : "disconnected");
     tft.printf("uptime: %d\n", Uptime::seconds());
 
@@ -145,8 +144,9 @@ void loop(void) {
     lastmillis = millis();
 
     tft.printf("fps: %2d (%4d)ms\n", lastfps, ms);
-
-  } else {
+    screenoff = false;
+    
+  } else if (b) {
     // draw clock
     if (clock.hasBeenSet()) {
       tft.printf("Paris: %d:%02d%s, %s", paris.hourFormat12(), paris.minute(), paris.isAM() ? "am":"pm", paris.weekdayString());
@@ -179,6 +179,8 @@ void loop(void) {
       }
       tft.print(longdate);
     }
+  } else {
+    delay(10);  // todo: if I don't include this, the wifi disconnects.  delay(1) doesn't work, nor does yield()  wierd
   }
 }
 

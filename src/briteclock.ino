@@ -145,7 +145,7 @@ void loop(void) {
 
     tft.printf("fps: %2d (%4d)ms\n", lastfps, ms);
     screenoff = false;
-    
+
   } else if (b) {
     // draw clock
     if (clock.hasBeenSet()) {

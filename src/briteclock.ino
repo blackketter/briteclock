@@ -9,9 +9,16 @@
 // create Credentials.h and define const char* ssid and passphrase
 #include "Credentials.h"
 
+#include "Wire.h"
+
 // platformio seems to need these FIXME
+#ifdef ESP32
+#include <ESPmDNS.h>
+//#include <ESPHTTPClient.h>
+#else
 #include <ESP8266mDNS.h>
 #include <ESP8266HTTPClient.h>
+#endif
 #include <NTPClient.h>
 #include <ArduinoOTA.h>
 
@@ -22,14 +29,31 @@
 #define LIGHT_SENSOR (A0)
 
 #define ANALOGRANGE (1024)
+#define WHITE_BRIGHTNESS (500)
 #define BUTTON_PIN (D1)
 
 Switch button = Switch(BUTTON_PIN);  // Switch between a digital pin and GND
 
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
 
-Clock clock;
-Clock paris;
+Clock localTime;
+Clock parisTime;
+Clock easternTime;
+
+//Central European Time (Frankfurt, Paris)
+TimeChangeRule CEST = {"CEST", Last, Sun, Mar, 2, 120};     //Central European Summer Time
+TimeChangeRule CET = {"CET ", Last, Sun, Oct, 3, 60};       //Central European Standard Time
+Timezone CE(CEST, CET);
+
+//US Eastern Time Zone (New York, Washington DC)
+TimeChangeRule usEDT = {"EDT", Second, Sun, Mar, 2, -240};
+TimeChangeRule usEST = {"EST", First, Sun, Nov, 2, -300};
+Timezone usET(usEDT, usEST);
+
+//US Pacific Time Zone (Las Vegas, Los Angeles)
+TimeChangeRule usPDT = {"PDT", Second, Sun, Mar, 2, -420};
+TimeChangeRule usPST = {"PST", First, Sun, Nov, 2, -480};
+Timezone usPT(usPDT, usPST);
 
 WiFiThing thing;
 // WiFiConsole console is provided by WiFiThing
@@ -58,8 +82,9 @@ void setup() {
 
   tft.fillScreen(ILI9341_BLACK);
 
-  paris.setZoneOffset(1*60*60);
-  clock.setZoneOffset(-8*60*60);
+//  parisTime.setZone(&CE);
+  easternTime.setZone(&usET);
+  localTime.setZone(&usPT);
 }
 
 
@@ -77,8 +102,8 @@ void loop(void) {
 
   // redraw every hour
   static int lastHour = 0;
-  if (lastHour != clock.hour()) {
-    lastHour = clock.hour();
+  if (lastHour != localTime.hour()) {
+    lastHour = localTime.hour();
     redraw = true;
   }
 
@@ -117,16 +142,26 @@ void loop(void) {
 
   tft.setCursor(0, 0);
   tft.setTextSize(2);
-  uint16_t c = ILI9341_RED;
+  uint16_t c;
+
+  if (b > WHITE_BRIGHTNESS) {
+    c = ILI9341_WHITE;
+  } else {
+    c = ILI9341_RED;
+  }
+
   tft.setTextColor(c, ILI9341_BLACK);
 
   if (button.longPressLatch()) {
     // draw info
     tft.print("Date: ");
-    clock.shortDate(tft);
+    localTime.shortDate(tft);
     tft.print("\nTime: ");
-    clock.longTime(tft);
-    tft.printf(".%01d\n",clock.fracMillis()/100);
+    localTime.longTime(tft);
+    tft.printf(".%01d\n",localTime.fracMillis()/100);
+
+    tft.printf("Offset: %d\n", localTime.getZoneOffset());
+
     tft.printf("wifi: %s\n", WiFi.isConnected() ? "connected   " : "disconnected");
     tft.printf("uptime: %d\n", Uptime::seconds());
 
@@ -148,8 +183,15 @@ void loop(void) {
 
   } else if (b) {
     // draw clock
-    if (clock.hasBeenSet()) {
-      tft.printf("Paris: %d:%02d%s, %s", paris.hourFormat12(), paris.minute(), paris.isAM() ? "am":"pm", paris.weekdayString());
+    if (localTime.hasBeenSet()) {
+      const char* abbrev = "???";
+      TimeChangeRule* rule = easternTime.getZoneRule();
+
+      if (rule) {
+        abbrev = rule->abbrev;
+      }
+
+      tft.printf("%s: %d:%02d%s, %s", abbrev, easternTime.hourFormat12(), easternTime.minute(), easternTime.isAM() ? "am":"pm", easternTime.weekdayString());
     } else if (!WiFi.isConnected()){
       tft.println("Connecting...");
     } else {
@@ -158,11 +200,11 @@ void loop(void) {
 
     tft.setTextSize(10);
     tft.println();
-    if (clock.hasBeenSet()) {
+    if (localTime.hasBeenSet()) {
 
-      tft.printf("%2d:%02d",clock.hourFormat12(),clock.minute());
+      tft.printf("%2d:%02d",localTime.hourFormat12(),localTime.minute());
       tft.setTextSize(1);
-      tft.printf("%02d",clock.second());
+      tft.printf("%02d",localTime.second());
     }
 
     tft.setTextSize(10);
@@ -170,9 +212,9 @@ void loop(void) {
 
     tft.setTextSize(2);
 
-    if (clock.hasBeenSet()) {
+    if (localTime.hasBeenSet()) {
       char longdate[100];
-      sprintf(longdate, "%s, %s %d", clock.weekdayString(), clock.monthString(), clock.day());
+      sprintf(longdate, "%s, %s %d", localTime.weekdayString(), localTime.monthString(), localTime.day());
       int spaces = (320/(2*6) - strlen(longdate))/2;
       for (int i = 0; i < spaces; i++) {
         tft.print(" ");

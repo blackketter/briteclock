@@ -92,7 +92,7 @@ void loop(void) {
 
   button.poll();
 
-  thing.loop();
+  thing.idle();
 
   static time_t lastTime = 0;
   static int fps = 0;

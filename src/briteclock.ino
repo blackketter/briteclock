@@ -40,21 +40,6 @@ Clock localTime;
 Clock parisTime;
 Clock easternTime;
 
-//Central European Time (Frankfurt, Paris)
-TimeChangeRule CEST = {"CEST", Last, Sun, Mar, 2, 120};     //Central European Summer Time
-TimeChangeRule CET = {"CET ", Last, Sun, Oct, 3, 60};       //Central European Standard Time
-Timezone CE(CEST, CET);
-
-//US Eastern Time Zone (New York, Washington DC)
-TimeChangeRule usEDT = {"EDT", Second, Sun, Mar, 2, -240};
-TimeChangeRule usEST = {"EST", First, Sun, Nov, 2, -300};
-Timezone usET(usEDT, usEST);
-
-//US Pacific Time Zone (Las Vegas, Los Angeles)
-TimeChangeRule usPDT = {"PDT", Second, Sun, Mar, 2, -420};
-TimeChangeRule usPST = {"PST", First, Sun, Nov, 2, -480};
-Timezone usPT(usPDT, usPST);
-
 WiFiThing thing;
 // WiFiConsole console is provided by WiFiThing
 
@@ -163,7 +148,7 @@ void loop(void) {
     tft.printf("Offset: %d\n", localTime.getZoneOffset());
 
     tft.printf("wifi: %s\n", WiFi.isConnected() ? "connected   " : "disconnected");
-    tft.printf("uptime: %d\n", Uptime::seconds());
+    tft.printf("uptime: %d\n", (int)Uptime::seconds());
 
     String hostname = thing.getHostname();
     tft.printf("host:%s.local\n", hostname.c_str());
@@ -173,7 +158,6 @@ void loop(void) {
     tft.printf("ambient: %4d\n", ambient);
     tft.printf("brightness: %4d\n", b);
 
-    static int16_t x = 0;
     static uint32_t lastmillis = millis();
     uint32_t ms = millis() - lastmillis;
     lastmillis = millis();

@@ -25,13 +25,13 @@
 #if defined(ESP32)
 #define TFT_CS   15
 #define TFT_DC   33
-#define TFT_BL   22
+#define TFT_BL   19
 #define TFT_RST    16
 
 #define BUTTON_PIN 12
 
 #define ANALOGRANGE (4096)
-#define PWMRANGE (255)
+#define PWMRANGE (1023)
 #define WHITE_BRIGHTNESS (50)
 #define LIGHT_SENSOR (34)
 
@@ -65,17 +65,21 @@ const int ledChannel = 0;
 void setupBacklight() {
 #if defined(ESP32)
   int freq = 5000;
-  int resolution = 8;
+  int resolution = 10;
   ledcSetup(ledChannel, freq, resolution);
+// didn't help
+//  pinMode(TFT_BL, OUTPUT_OPEN_DRAIN);
   ledcAttachPin(TFT_BL, ledChannel);
 #else
   pinMode(TFT_BL, OUTPUT);
+//  pinMode(LIGHT_SENSOR, ANALOG);
+
+  analogWriteRange(PWMRANGE);
   analogWrite(TFT_BL, 0);
-  pinMode(LIGHT_SENSOR, ANALOG);
 #endif
 }
 
-void setBacklight(uint8_t b) {
+void setBacklight(uint16_t b) {
 #if defined(ESP32)
   ledcWrite(ledChannel, b);
 #else
@@ -142,9 +146,6 @@ void loop(void) {
 
   static bool screenoff = false;
   static bool toggleInfo =  false;
-if (button.released() || button.longPress()) {
-    redraw = true;
-  }
 
   if (button.pushed()) {
     if (toggleInfo) {
@@ -153,11 +154,13 @@ if (button.released() || button.longPress()) {
     } else {
       screenoff = !screenoff;
     }
+    redraw = true;
   }
 
   if (button.longPress()) {
     toggleInfo = true;
     screenoff = false;
+    redraw = true;
   }
 
   static uint32_t b = 128;
@@ -165,7 +168,7 @@ if (button.released() || button.longPress()) {
 
   b = (ambient*PWMRANGE)/ANALOGRANGE;
   if (b == 0) { b = 1; }
-  if (screenoff && !button.on()) {
+  if (screenoff) {
     b = 0;
   }
 

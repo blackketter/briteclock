@@ -1,18 +1,21 @@
 [submodule "lib/Switch"]
-	path = lib/Switch
+	path = lib/common/Switch
 	url = https://github.com/blackketter/Switch.git
 [submodule "lib/WiFiThing"]
-	path = lib/WiFiThing
+	path = lib/common/WiFiThing
 	url = https://github.com/blackketter/WiFiThing.git
 [submodule "lib/Console"]
-	path = lib/Console
+	path = lib/common/Console
 	url = https://github.com/blackketter/Console.git
 [submodule "lib/Timezone"]
-	path = lib/Timezone
+	path = lib/common/Timezone
 	url = https://github.com/blackketter/Timezone.git
 [submodule "lib/Clock"]
-	path = lib/Clock
+	path = lib/common/Clock
 	url = https://github.com/blackketter/Clock.git
 [submodule "lib/NTPClient"]
-	path = lib/NTPClient
+	path = lib/common/NTPClient
 	url = https://github.com/blackketter/NTPClient.git
+[submodule "lib/esp8266/Adafruit_ILI9341"]
+	path = lib/esp8266/Adafruit_ILI9341
+	url = https://github.com/blackketter/Adafruit_ILI9341.git

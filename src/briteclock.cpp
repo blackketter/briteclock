@@ -2,8 +2,14 @@
 #include <Switch.h>
 
 #include "SPI.h"
+#if defined(ESP32)
+#include "TFT_eSPI.h"
+#else
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
+#endif
+
+
 #include "WiFiThing.h"
 #include "Clock.h"
 // create Credentials.h and define const char* ssid and passphrase
@@ -22,11 +28,10 @@
 #include <NTPClient.h>
 #include <ArduinoOTA.h>
 
+#include "Commands/FPSCommand.h"
+FPSCommand theFPSCommand;
+
 #if defined(ESP32)
-#define TFT_CS   15
-#define TFT_DC   33
-#define TFT_BL   19
-#define TFT_RST    16
 
 #define BUTTON_PIN 12
 
@@ -46,12 +51,21 @@
 #define ANALOGRANGE (1024)
 #define WHITE_BRIGHTNESS (500)
 #define LIGHT_SENSOR (A0)
+#define TFT_BLACK ILI9341_BLACK
+#define TFT_WHITE ILI9341_WHITE
+#define TFT_RED ILI9341_RED
+
 #endif
 
 
 Switch button = Switch(BUTTON_PIN);  // Switch between a digital pin and GND
 
+#if defined(ESP32)
+TFT_eSPI tft = TFT_eSPI();
+
+#else
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
+#endif
 
 Clock localTime;
 Clock parisTime;
@@ -67,8 +81,6 @@ void setupBacklight() {
   int freq = 5000;
   int resolution = 10;
   ledcSetup(ledChannel, freq, resolution);
-// didn't help
-//  pinMode(TFT_BL, OUTPUT_OPEN_DRAIN);
   ledcAttachPin(TFT_BL, ledChannel);
 #else
   pinMode(TFT_BL, OUTPUT);
@@ -81,7 +93,7 @@ void setupBacklight() {
 
 void setBacklight(uint16_t b) {
 #if defined(ESP32)
-  ledcWrite(ledChannel, b);
+  ledcWrite(ledChannel, PWMRANGE-b);
 #else
   analogWrite(TFT_BL, b);
 #endif
@@ -95,6 +107,7 @@ void setup() {
   tft.begin();
   tft.setRotation(3);
 
+#if 0
   // read diagnostics (optional but can help debug problems)
   uint8_t x = tft.readcommand8(ILI9341_RDMODE);
   console.debugf("Display Power Mode: 0x%x\n", x);
@@ -106,15 +119,39 @@ void setup() {
   console.debugf("Image Format: 0x%x\n", x);
   x = tft.readcommand8(ILI9341_RDSELFDIAG);
   console.debugf("Self Diagnostic: 0x%x\n", x);
+#endif
 
-  tft.fillScreen(ILI9341_BLACK);
+  tft.fillScreen(TFT_BLACK);
 
 //  parisTime.setZone(&CE);
   easternTime.setZone(&usET);
   localTime.setZone(&usPT);
 }
 
+uint32_t updateBrightness(uint32_t light) {
 
+  const uint8_t historyLen = 8;
+  static uint8_t last = 0;
+  static uint32_t lightHistory[historyLen];
+
+  lightHistory[last] = light;
+  last++;
+  if (last >= historyLen) {
+    last = 0;
+  }
+
+  uint32_t lightAve = 0;
+  for (uint8_t i = 0; i<historyLen; i++) {
+    lightAve += lightHistory[i];
+  }
+  lightAve /= historyLen;
+
+  uint32_t brightness = (lightAve*PWMRANGE)/ANALOGRANGE;
+
+  if (brightness == 0) { brightness = 1; }
+
+  return brightness;
+}
 
 void loop(void) {
 
@@ -123,8 +160,6 @@ void loop(void) {
   thing.idle();
 
   static time_t lastTime = 0;
-  static int fps = 0;
-  static int lastfps = 0;
 
   bool redraw = false;
 
@@ -137,11 +172,6 @@ void loop(void) {
 
   if (Uptime::seconds() != lastTime) {
     lastTime = Uptime::seconds();
-    lastfps = fps;
-    fps = 0;
-
-  } else {
-    fps++;
   }
 
   static bool screenoff = false;
@@ -166,8 +196,8 @@ void loop(void) {
   static uint32_t b = 128;
   uint32_t ambient = analogRead(LIGHT_SENSOR);
 
-  b = (ambient*PWMRANGE)/ANALOGRANGE;
-  if (b == 0) { b = 1; }
+  b = updateBrightness(ambient);
+
   if (screenoff) {
     b = 0;
   }
@@ -175,7 +205,7 @@ void loop(void) {
   setBacklight(b);
 
   if (redraw) {
-    tft.fillScreen(ILI9341_BLACK);
+    tft.fillScreen(TFT_BLACK);
   }
 
   tft.setCursor(0, 0);
@@ -183,14 +213,12 @@ void loop(void) {
   uint16_t c;
 
   if (b > WHITE_BRIGHTNESS) {
-    c = ILI9341_WHITE;
+    c = TFT_WHITE;
   } else {
-    c = ILI9341_RED;
+    c = TFT_RED;
   }
 
-  tft.setTextColor(c, ILI9341_BLACK);
-
-
+  tft.setTextColor(c, TFT_BLACK);
 
   if (toggleInfo) {
     // draw info
@@ -212,14 +240,10 @@ void loop(void) {
 
     tft.printf("ambient: %4d\n", ambient);
     tft.printf("brightness: %4d\n", b);
+    tft.printf("fps: %3.2f\n", theFPSCommand.lastFPS());
 
-    static uint32_t lastmillis = millis();
-    uint32_t ms = millis() - lastmillis;
-    lastmillis = millis();
-
-    tft.printf("fps: %2d (%4d)ms\n", lastfps, ms);
     screenoff = false;
-
+    theFPSCommand.newFrame();
   } else if (b) {
     // draw clock
     if (localTime.hasBeenSet()) {
@@ -259,6 +283,7 @@ void loop(void) {
         tft.print(" ");
       }
       tft.print(longdate);
+      theFPSCommand.newFrame();
     }
   } else {
     delay(10);  // todo: if I don't include this, the wifi disconnects.  delay(1) doesn't work, nor does yield()  wierd

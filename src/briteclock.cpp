@@ -2,11 +2,11 @@
 #include <Switch.h>
 
 #include "SPI.h"
-#if defined(ESP32)
 #include "TFT_eSPI.h"
+#if defined(ESP32)
 #else
-#include "Adafruit_GFX.h"
-#include "Adafruit_ILI9341.h"
+//#include "Adafruit_GFX.h"
+//#include "Adafruit_ILI9341.h"
 #endif
 
 
@@ -33,42 +33,39 @@ FPSCommand theFPSCommand;
 
 #if defined(ESP32)
 
-#define BUTTON_PIN 12
+	#define BUTTON_PIN 12
 
-#define ANALOGRANGE (4096)
-#define PWMRANGE (1023)
-#define WHITE_BRIGHTNESS (50)
-#define LIGHT_SENSOR (34)
+	#define ANALOGRANGE (4096)
+	#define PWMRANGE (1023)
+	#define WHITE_BRIGHTNESS (50)
+	#define LIGHT_SENSOR (34)
 
 #else // esp8266
-#define TFT_DC     2
-#define TFT_CS     4
-#define TFT_BL     0
-#define TFT_RST    16
+//	#define TFT_DC     2
+//	#define TFT_CS     4
+//	#define TFT_BL     0
+//	#define TFT_RST    16
 
-#define BUTTON_PIN (D1)
+	#define BUTTON_PIN (D1)
 
-#define ANALOGRANGE (1024)
-#define WHITE_BRIGHTNESS (500)
-#define LIGHT_SENSOR (A0)
-#define TFT_BLACK ILI9341_BLACK
-#define TFT_WHITE ILI9341_WHITE
-#define TFT_RED ILI9341_RED
-
+	#define ANALOGRANGE (1024)
+	#define WHITE_BRIGHTNESS (500)
+	#define LIGHT_SENSOR (A0)
+	#define TFT_BLACK ILI9341_BLACK
+	#define TFT_WHITE ILI9341_WHITE
+	#define TFT_RED ILI9341_RED
 #endif
-
 
 Switch button = Switch(BUTTON_PIN);  // Switch between a digital pin and GND
 
-#if defined(ESP32)
+//#if defined(ESP32)
 TFT_eSPI tft = TFT_eSPI();
 
-#else
-Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
-#endif
+//#else
+//Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
+//#endif
 
 Clock localTime;
-Clock parisTime;
 Clock easternTime;
 
 WiFiThing thing;
@@ -123,7 +120,6 @@ void setup() {
 
   tft.fillScreen(TFT_BLACK);
 
-//  parisTime.setZone(&CE);
   easternTime.setZone(&usET);
   localTime.setZone(&usPT);
 }
@@ -208,8 +204,6 @@ void loop(void) {
     tft.fillScreen(TFT_BLACK);
   }
 
-  tft.setCursor(0, 0);
-  tft.setTextSize(2);
   uint16_t c;
 
   if (b > WHITE_BRIGHTNESS) {
@@ -219,8 +213,14 @@ void loop(void) {
   }
 
   tft.setTextColor(c, TFT_BLACK);
+  tft.setTextFont(2);
+//  tft.setTextSize(2);
+//  tft.setFreeFont(&FreeSans9pt7b);
+  tft.setCursor(0, 0 /*tft.fontHeight()*/);
 
   if (toggleInfo) {
+  	tft.setTextFont(2);
+  	tft.setCursor(0,0);
     // draw info
     tft.print("Date: ");
     localTime.shortDate(tft);
@@ -230,17 +230,17 @@ void loop(void) {
 
     tft.printf("Offset: %d\n", localTime.getZoneOffset());
 
-    tft.printf("wifi: %s\n", WiFi.isConnected() ? "connected   " : "disconnected");
-    tft.printf("uptime: %d\n", (int)Uptime::seconds());
+    tft.printf("WiFi is %s\n", WiFi.isConnected() ? "connected   " : "disconnected");
+    tft.printf("Uptime: %d\n", (int)Uptime::seconds());
 
     String hostname = thing.getHostname();
-    tft.printf("host:%s.local\n", hostname.c_str());
+    tft.printf("Hostname: %s.local\n", hostname.c_str());
     String ip = thing.getIPAddress();
-    tft.printf("ip: %s\n", ip.c_str());;
+    tft.printf("IP: %s\n", ip.c_str());;
 
-    tft.printf("ambient: %4d\n", ambient);
-    tft.printf("brightness: %4d\n", b);
-    tft.printf("fps: %3.2f\n", theFPSCommand.lastFPS());
+    tft.printf("Ambient: %4d\n", ambient);
+    tft.printf("Brightness: %4d\n", b);
+    tft.printf("FPS: %3.2f\n", theFPSCommand.lastFPS());
 
     screenoff = false;
     theFPSCommand.newFrame();
@@ -253,7 +253,7 @@ void loop(void) {
       if (rule) {
         abbrev = rule->abbrev;
       }
-
+	  tft.setTextFont(2);
       tft.printf("%s: %d:%02d%s, %s", abbrev, easternTime.hourFormat12(), easternTime.minute(), easternTime.isAM() ? "am":"pm", easternTime.weekdayString());
     } else if (!WiFi.isConnected()){
       tft.println("Connecting...");
@@ -261,27 +261,39 @@ void loop(void) {
       tft.println("Trying to set time...");
     }
 
-    tft.setTextSize(10);
-    tft.println();
-    if (localTime.hasBeenSet()) {
+//    tft.setTextSize(10);
+      tft.setTextFont(8);
+//    tft.println();
+        char timeStr[6];
 
-      tft.printf("%2d:%02d",localTime.hourFormat12(),localTime.minute());
-      tft.setTextSize(1);
+    if (localTime.hasBeenSet()) {
+      sprintf(timeStr,"%d:%02d",localTime.hourFormat12(),localTime.minute());
+      tft.setCursor(160-tft.textWidth(timeStr)/2,120-tft.fontHeight()/2);
+      tft.print(timeStr);
+//      tft.setTextSize(1);
+      tft.setTextFont(2);
       tft.printf("%02d",localTime.second());
     }
 
-    tft.setTextSize(10);
+//    tft.setTextSize(10);
+    tft.setTextFont(8);
+    tft.println();
+    tft.setTextFont(4);
     tft.println();
 
-    tft.setTextSize(2);
+//    tft.setTextSize(2);
 
     if (localTime.hasBeenSet()) {
       char longdate[100];
       sprintf(longdate, "%s, %s %d", localTime.weekdayString(), localTime.monthString(), localTime.day());
+      tft.setCursor(160-tft.textWidth(longdate)/2, tft.getCursorY());
+
+/*
       int spaces = (320/(2*6) - strlen(longdate))/2;
       for (int i = 0; i < spaces; i++) {
         tft.print(" ");
       }
+*/
       tft.print(longdate);
       theFPSCommand.newFrame();
     }

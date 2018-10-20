@@ -3,6 +3,8 @@
 
 #include "SPI.h"
 #include "TFT_eSPI.h"
+#include "NullStream.h"
+
 #if defined(ESP32)
 #else
 //#include "Adafruit_GFX.h"
@@ -28,32 +30,52 @@
 #include <NTPClient.h>
 #include <ArduinoOTA.h>
 
+uint32_t ambient;
+uint32_t brightness = 128;
+
 #include "Commands/FPSCommand.h"
 FPSCommand theFPSCommand;
 
+class ScreenCommand : public Command {
+  public:
+    const char* getName() { return "screen"; }
+    const char* getHelp() { return ("display screen info"); }
+    void execute(Stream* c, uint8_t paramCount, char** params) {
+      c->printf("  Ambient: %4d\n", ambient);
+      c->printf("  Brightness: %4d\n", brightness);
+      c->printf("  FPS: %3.2f\n", theFPSCommand.lastFPS());
+    }
+};
+ScreenCommand theScreenCommand;
+
 #if defined(ESP32)
 
-	#define BUTTON_PIN 12
+  #define BUTTON_PIN 12
 
-	#define ANALOGRANGE (4096)
-	#define PWMRANGE (1023)
-	#define WHITE_BRIGHTNESS (50)
-	#define LIGHT_SENSOR (34)
+  #define ANALOGRANGE (4096)
+
+  #define PWMRESOLUTION (10)
+  #define PWMRANGE (1023)
+
+  #define WHITE_BRIGHTNESS (50)
+  #define LIGHT_SENSOR (34)
 
 #else // esp8266
-//	#define TFT_DC     2
-//	#define TFT_CS     4
-//	#define TFT_BL     0
-//	#define TFT_RST    16
+//  #define TFT_DC     2
+//  #define TFT_CS     4
+//  #define TFT_BL     0
+//  #define TFT_RST    16
 
-	#define BUTTON_PIN (D1)
+  #define BUTTON_PIN (D1)
 
-	#define ANALOGRANGE (1024)
-	#define WHITE_BRIGHTNESS (500)
-	#define LIGHT_SENSOR (A0)
-	#define TFT_BLACK ILI9341_BLACK
-	#define TFT_WHITE ILI9341_WHITE
-	#define TFT_RED ILI9341_RED
+  // NOTE: esp8266 pwm calculations are done in microseconds, so make sure things are in power of 10 units
+  #define PWMRANGE (1000)
+  #define ANALOGRANGE (1024)
+  #define WHITE_BRIGHTNESS (500)
+  #define LIGHT_SENSOR (A0)
+  #define TFT_BLACK ILI9341_BLACK
+  #define TFT_WHITE ILI9341_WHITE
+  #define TFT_RED ILI9341_RED
 #endif
 
 Switch button = Switch(BUTTON_PIN);  // Switch between a digital pin and GND
@@ -76,8 +98,7 @@ const int ledChannel = 0;
 void setupBacklight() {
 #if defined(ESP32)
   int freq = 5000;
-  int resolution = 10;
-  ledcSetup(ledChannel, freq, resolution);
+  ledcSetup(ledChannel, freq, PWMRESOLUTION);
   ledcAttachPin(TFT_BL, ledChannel);
 #else
   pinMode(TFT_BL, OUTPUT);
@@ -104,27 +125,11 @@ void setup() {
   tft.begin();
   tft.setRotation(3);
 
-#if 0
-  // read diagnostics (optional but can help debug problems)
-  uint8_t x = tft.readcommand8(ILI9341_RDMODE);
-  console.debugf("Display Power Mode: 0x%x\n", x);
-  x = tft.readcommand8(ILI9341_RDMADCTL);
-  console.debugf("MADCTL Mode: 0x%x\n", x);
-  x = tft.readcommand8(ILI9341_RDPIXFMT);
-  console.debugf("Pixel Format: 0x%x\n", x);
-  x = tft.readcommand8(ILI9341_RDIMGFMT);
-  console.debugf("Image Format: 0x%x\n", x);
-  x = tft.readcommand8(ILI9341_RDSELFDIAG);
-  console.debugf("Self Diagnostic: 0x%x\n", x);
-#endif
-
-  tft.fillScreen(TFT_BLACK);
-
   easternTime.setZone(&usET);
   localTime.setZone(&usPT);
 }
 
-uint32_t updateBrightness(uint32_t light) {
+uint32_t calculateBrightness(uint32_t light) {
 
   const uint8_t historyLen = 8;
   static uint8_t last = 0;
@@ -152,15 +157,15 @@ uint32_t updateBrightness(uint32_t light) {
 void loop(void) {
 
   button.poll();
-
   thing.idle();
 
   static time_t lastTime = 0;
 
   bool redraw = false;
+  bool update = false;
 
   // redraw every hour
-  static int lastHour = 0;
+  static int lastHour = 100;
   if (lastHour != localTime.hour()) {
     lastHour = localTime.hour();
     redraw = true;
@@ -168,14 +173,15 @@ void loop(void) {
 
   if (Uptime::seconds() != lastTime) {
     lastTime = Uptime::seconds();
+    update = true;
   }
 
   static bool screenoff = false;
-  static bool toggleInfo =  false;
+  static bool showinfo =  false;
 
   if (button.pushed()) {
-    if (toggleInfo) {
-      toggleInfo = false;
+    if (showinfo) {
+      showinfo = false;
       screenoff = false;
     } else {
       screenoff = !screenoff;
@@ -184,21 +190,20 @@ void loop(void) {
   }
 
   if (button.longPress()) {
-    toggleInfo = true;
+    showinfo = true;
     screenoff = false;
     redraw = true;
   }
 
-  static uint32_t b = 128;
-  uint32_t ambient = analogRead(LIGHT_SENSOR);
+  ambient = analogRead(LIGHT_SENSOR);
 
-  b = updateBrightness(ambient);
+  brightness = calculateBrightness(ambient);
 
   if (screenoff) {
-    b = 0;
+    brightness = 0;
   }
 
-  setBacklight(b);
+  setBacklight(brightness);
 
   if (redraw) {
     tft.fillScreen(TFT_BLACK);
@@ -206,7 +211,7 @@ void loop(void) {
 
   uint16_t c;
 
-  if (b > WHITE_BRIGHTNESS) {
+  if (brightness > WHITE_BRIGHTNESS) {
     c = TFT_WHITE;
   } else {
     c = TFT_RED;
@@ -214,37 +219,18 @@ void loop(void) {
 
   tft.setTextColor(c, TFT_BLACK);
   tft.setTextFont(2);
-//  tft.setTextSize(2);
-//  tft.setFreeFont(&FreeSans9pt7b);
   tft.setCursor(0, 0 /*tft.fontHeight()*/);
 
-  if (toggleInfo) {
-  	tft.setTextFont(2);
-  	tft.setCursor(0,0);
-    // draw info
-    tft.print("Date: ");
-    localTime.shortDate(tft);
-    tft.print("\nTime: ");
-    localTime.longTime(tft);
-    tft.printf(".%01d\n",localTime.fracMillis()/100);
+  if (showinfo) {
+    tft.setTextFont(2);
+    tft.setCursor(0,0);
+    // commands take Streams, but tft is a Print, so we need an adapter.
+    PrintStream tftstream(&tft);
+    console.executeCommandLine(&tftstream, "info");
+    console.executeCommandLine(&tftstream, "screen");
 
-    tft.printf("Offset: %d\n", localTime.getZoneOffset());
-
-    tft.printf("WiFi is %s\n", WiFi.isConnected() ? "connected   " : "disconnected");
-    tft.printf("Uptime: %d\n", (int)Uptime::seconds());
-
-    String hostname = thing.getHostname();
-    tft.printf("Hostname: %s.local\n", hostname.c_str());
-    String ip = thing.getIPAddress();
-    tft.printf("IP: %s\n", ip.c_str());;
-
-    tft.printf("Ambient: %4d\n", ambient);
-    tft.printf("Brightness: %4d\n", b);
-    tft.printf("FPS: %3.2f\n", theFPSCommand.lastFPS());
-
-    screenoff = false;
     theFPSCommand.newFrame();
-  } else if (b) {
+  } else if (brightness && update) {
     // draw clock
     if (localTime.hasBeenSet()) {
       const char* abbrev = "???";
@@ -253,7 +239,7 @@ void loop(void) {
       if (rule) {
         abbrev = rule->abbrev;
       }
-	  tft.setTextFont(2);
+    tft.setTextFont(2);
       tft.printf("%s: %d:%02d%s, %s", abbrev, easternTime.hourFormat12(), easternTime.minute(), easternTime.isAM() ? "am":"pm", easternTime.weekdayString());
     } else if (!WiFi.isConnected()){
       tft.println("Connecting...");
@@ -261,39 +247,27 @@ void loop(void) {
       tft.println("Trying to set time...");
     }
 
-//    tft.setTextSize(10);
       tft.setTextFont(8);
-//    tft.println();
         char timeStr[6];
 
     if (localTime.hasBeenSet()) {
       sprintf(timeStr,"%d:%02d",localTime.hourFormat12(),localTime.minute());
       tft.setCursor(160-tft.textWidth(timeStr)/2,120-tft.fontHeight()/2);
       tft.print(timeStr);
-//      tft.setTextSize(1);
       tft.setTextFont(2);
       tft.printf("%02d",localTime.second());
     }
 
-//    tft.setTextSize(10);
     tft.setTextFont(8);
     tft.println();
     tft.setTextFont(4);
     tft.println();
-
-//    tft.setTextSize(2);
 
     if (localTime.hasBeenSet()) {
       char longdate[100];
       sprintf(longdate, "%s, %s %d", localTime.weekdayString(), localTime.monthString(), localTime.day());
       tft.setCursor(160-tft.textWidth(longdate)/2, tft.getCursorY());
 
-/*
-      int spaces = (320/(2*6) - strlen(longdate))/2;
-      for (int i = 0; i < spaces; i++) {
-        tft.print(" ");
-      }
-*/
       tft.print(longdate);
       theFPSCommand.newFrame();
     }

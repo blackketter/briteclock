@@ -1,34 +1,13 @@
 #include <Arduino.h>
 #include <Switch.h>
 
-#include "SPI.h"
 #include "TFT_eSPI.h"
 #include "NullStream.h"
-
-#if defined(ESP32)
-#else
-//#include "Adafruit_GFX.h"
-//#include "Adafruit_ILI9341.h"
-#endif
-
 
 #include "WiFiThing.h"
 #include "Clock.h"
 // create Credentials.h and define const char* ssid and passphrase
 #include "Credentials.h"
-
-#include "Wire.h"
-
-// platformio seems to need these FIXME
-#ifdef ESP32
-#include <ESPmDNS.h>
-//#include <ESPHTTPClient.h>
-#else
-#include <ESP8266mDNS.h>
-#include <ESP8266HTTPClient.h>
-#endif
-#include <NTPClient.h>
-#include <ArduinoOTA.h>
 
 uint32_t ambient;
 uint32_t brightness = 128;
@@ -55,7 +34,7 @@ ScreenCommand theScreenCommand;
   #define ANALOGRANGE (4096)
 
   #define PWMRESOLUTION (10)
-  #define PWMRANGE (1023)
+const uint32_t  analogWriteMax = 1023;
 
   #define WHITE_BRIGHTNESS (50)
   #define LIGHT_SENSOR (34)
@@ -69,13 +48,10 @@ ScreenCommand theScreenCommand;
   #define BUTTON_PIN (D1)
 
   // NOTE: esp8266 pwm calculations are done in microseconds, so make sure things are in power of 10 units
-  #define PWMRANGE (1000)
+const uint32_t  analogWriteMax = 1000;
   #define ANALOGRANGE (1024)
   #define WHITE_BRIGHTNESS (500)
   #define LIGHT_SENSOR (A0)
-  #define TFT_BLACK ILI9341_BLACK
-  #define TFT_WHITE ILI9341_WHITE
-  #define TFT_RED ILI9341_RED
 #endif
 
 Switch button = Switch(BUTTON_PIN);  // Switch between a digital pin and GND
@@ -104,14 +80,14 @@ void setupBacklight() {
   pinMode(TFT_BL, OUTPUT);
 //  pinMode(LIGHT_SENSOR, ANALOG);
 
-  analogWriteRange(PWMRANGE);
+  analogWriteRange(analogWriteMax);
   analogWrite(TFT_BL, 0);
 #endif
 }
 
 void setBacklight(uint16_t b) {
 #if defined(ESP32)
-  ledcWrite(ledChannel, PWMRANGE-b);
+  ledcWrite(ledChannel, analogWriteMax-b);
 #else
   analogWrite(TFT_BL, b);
 #endif
@@ -147,7 +123,7 @@ uint32_t calculateBrightness(uint32_t light) {
   }
   lightAve /= historyLen;
 
-  uint32_t brightness = (lightAve*PWMRANGE)/ANALOGRANGE;
+  uint32_t brightness = (lightAve*analogWriteMax)/ANALOGRANGE;
 
   if (brightness == 0) { brightness = 1; }
 
@@ -271,8 +247,6 @@ void loop(void) {
       tft.print(longdate);
       theFPSCommand.newFrame();
     }
-  } else {
-    delay(10);  // todo: if I don't include this, the wifi disconnects.  delay(1) doesn't work, nor does yield()  wierd
   }
 }
 

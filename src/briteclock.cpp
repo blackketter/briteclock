@@ -94,6 +94,9 @@ void setBacklight(uint16_t b) {
 }
 
 void setup() {
+  delay(1000);
+  thing.setTimezone(&usPT);
+  thing.setHostname(HOSTNAME);
 
   thing.begin(ssid, passphrase);
 

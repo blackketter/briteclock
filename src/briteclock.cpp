@@ -1,9 +1,10 @@
+
+#include "FS.h"
 #include <Arduino.h>
 #include <Switch.h>
 
 #include "TFT_eSPI.h"
 #include "NullStream.h"
-
 #include "WiFiThing.h"
 #include "Clock.h"
 // create Credentials.h and define const char* ssid and passphrase
@@ -65,6 +66,7 @@ TFT_eSPI tft = TFT_eSPI();
 
 Clock localTime;
 Clock easternTime;
+Clock parisTime;
 
 WiFiThing thing;
 // WiFiConsole console is provided by WiFiThing
@@ -105,6 +107,7 @@ void setup() {
   tft.setRotation(3);
 
   easternTime.setZone(&usET);
+  parisTime.setZone(&CE);
   localTime.setZone(&usPT);
 }
 
@@ -213,13 +216,13 @@ void loop(void) {
     // draw clock
     if (localTime.hasBeenSet()) {
       const char* abbrev = "???";
-      TimeChangeRule* rule = easternTime.getZoneRule();
+      TimeChangeRule* rule = parisTime.getZoneRule();
 
       if (rule) {
         abbrev = rule->abbrev;
       }
-    tft.setTextFont(2);
-      tft.printf("%s: %d:%02d%s, %s", abbrev, easternTime.hourFormat12(), easternTime.minute(), easternTime.isAM() ? "am":"pm", easternTime.weekdayString());
+      tft.setTextFont(2);
+      tft.printf("%s: %d:%02d%s, %s", abbrev, parisTime.hourFormat12(), parisTime.minute(), parisTime.isAM() ? "am":"pm", parisTime.weekdayString());
     } else if (!WiFi.isConnected()){
       tft.println("Connecting...");
     } else {

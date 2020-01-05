@@ -1,5 +1,6 @@
-
+// this needs to be included early to fix a build problem
 #include "FS.h"
+
 #include <Arduino.h>
 #include <Switch.h>
 

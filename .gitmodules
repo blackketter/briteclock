@@ -19,6 +19,6 @@
 [submodule "lib/esp8266/Adafruit_ILI9341"]
 	path = lib/esp8266/Adafruit_ILI9341
 	url = https://github.com/blackketter/Adafruit_ILI9341.git
-[submodule "lib/esp32/TFTeSPI"]
-	path = lib/common/TFTeSPI
+[submodule "lib/common/TFT_eSPI"]
+	path = lib/common/TFT_eSPI
 	url = https://github.com/Bodmer/TFT_eSPI.git

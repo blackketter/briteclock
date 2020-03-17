@@ -21,10 +21,10 @@ class ScreenCommand : public Command {
   public:
     const char* getName() { return "screen"; }
     const char* getHelp() { return ("display screen info"); }
-    void execute(Stream* c, uint8_t paramCount, char** params) {
-      c->printf("  Ambient: %4d\n", ambient);
-      c->printf("  Brightness: %4d\n", brightness);
-      c->printf("  FPS: %3.2f\n", theFPSCommand.lastFPS());
+    void execute(Console* c, uint8_t paramCount, char** params) {
+      c->printf("Ambient: %4d\n", ambient);
+      c->printf("Brightness: %4d\n", brightness);
+      c->printf("FPS: %3.2f\n", theFPSCommand.lastFPS());
     }
 };
 ScreenCommand theScreenCommand;
@@ -66,8 +66,7 @@ TFT_eSPI tft = TFT_eSPI();
 //#endif
 
 Clock localTime;
-Clock easternTime;
-Clock parisTime;
+Clock otherTime;
 
 WiFiThing thing;
 // WiFiConsole console is provided by WiFiThing
@@ -107,8 +106,7 @@ void setup() {
   tft.begin();
   tft.setRotation(3);
 
-  easternTime.setZone(&usET);
-  parisTime.setZone(&CE);
+  otherTime.setZone(&usET);
   localTime.setZone(&usPT);
 }
 
@@ -134,6 +132,8 @@ uint32_t calculateBrightness(uint32_t light) {
 
   if (brightness == 0) { brightness = 1; }
 
+	if (brightness < 5) { brightness = 5; }
+	
   return brightness;
 }
 
@@ -211,19 +211,23 @@ void loop(void) {
     PrintStream tftstream(&tft);
     console.executeCommandLine(&tftstream, "info");
     console.executeCommandLine(&tftstream, "screen");
+    tftstream.print("Hostname: ");
+    tftstream.println(thing.getHostname());
+		tftstream.print("IP: ");
+    tftstream.println(thing.getIPAddress());
 
     theFPSCommand.newFrame();
   } else if (brightness && update) {
     // draw clock
     if (localTime.hasBeenSet()) {
       const char* abbrev = "???";
-      TimeChangeRule* rule = parisTime.getZoneRule();
+      TimeChangeRule* rule = otherTime.getZoneRule();
 
       if (rule) {
         abbrev = rule->abbrev;
       }
-      tft.setTextFont(2);
-      tft.printf("%s: %d:%02d%s, %s", abbrev, parisTime.hourFormat12(), parisTime.minute(), parisTime.isAM() ? "am":"pm", parisTime.weekdayString());
+      tft.setTextFont(4);
+      tft.printf("%s: %d:%02d%s, %s", abbrev, otherTime.hourFormat12(), otherTime.minute(), otherTime.isAM() ? "am":"pm", otherTime.weekdayString());
     } else if (!WiFi.isConnected()){
       tft.println("Connecting...");
     } else {

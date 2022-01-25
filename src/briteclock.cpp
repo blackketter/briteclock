@@ -106,7 +106,7 @@ void setup() {
   tft.begin();
   tft.setRotation(3);
 
-  otherTime.setZone(&usET);
+  otherTime.setZone(&UK);
   localTime.setZone(&usPT);
 }
 
@@ -234,8 +234,8 @@ void loop(void) {
       tft.println("Trying to set time...");
     }
 
-      tft.setTextFont(8);
-        char timeStr[6];
+    tft.setTextFont(8);
+    char timeStr[8];
 
     if (localTime.hasBeenSet()) {
       sprintf(timeStr,"%d:%02d",localTime.hourFormat12(),localTime.minute());
